@@ -27,11 +27,86 @@ class OperationApiManager(BaseApiManager):
         operation = await self.get_operation_object(operation_id, access)
         report = await operation.report(file_svc=self._file_svc, data_svc=self._data_svc, output=output)
         return report
+    
+    @staticmethod
+    def _create_step(self, link, order):
+        output_entries = []
+        if "output" in link:
+            if link["output"]["stdout"]:
+                output_entries.append({
+                    "content": link["output"]["stdout"],
+                    "level": "STDOUT",
+                    "type": "console"
+                })
+            if link["output"]["stderr"]:
+                output_entries.append({
+                    "content": link["output"]["stderr"],
+                    "level": "STDERR",
+                    "type": "console"
+                })
+        return {
+            "command": link["command"],
+            "executor": link["executor"],
+            "order": order,
+            "time-start": link["delegated_timestamp"].replace("Z", ".000Z"),
+            "time-stop": (link["finished_timestamp"] or link["delegated_timestamp"]).replace("Z", ".000Z"),
+            "output": output_entries
+        }
+
+    def _mapping_field_to_attire(self, link, procedure_order, order):
+        procedure = {
+            "procedure-name": link["ability_metadata"]["ability_name"],
+            "procedure-description": link["ability_metadata"]["ability_description"],
+            "procedure-id": {
+                "type": "guid",
+                "id": link["ability_metadata"]["ability_id"]
+            },
+            "mitre-technique-id": link["attack_metadata"]["technique_id"],
+            "order": procedure_order,
+            "steps": [
+                self._create_step(link, order)
+            ]
+        }
+        return procedure
+
+    def _event_logs_to_attire(self, data):
+        return_dict = {
+            "attire-version": "1.1",
+            "execution-data": {
+                "execution-command": "caldera",
+                "execution-id": str(uuid.uuid4()),
+                "execution-source": "Caldera",
+                "execution-category": {
+                    "name": "Caldera",
+                    "abbreviation": "CDR"
+                },
+                "target": {
+                    "host": "vcs",
+                    "ip": "0.0.0.0",
+                    "path": "PATH=C:",
+                    "user": "vcs-purple-team"
+                },
+                "time-generated": self.get_current_timestamp().replace("Z", ".000Z")
+            },
+            "procedures": []
+        }
+        procedure_list = []
+        for order, link in enumerate(data):
+            if link["delegated_timestamp"]:
+                if link["ability_metadata"]["ability_name"] not in procedure_list:
+                    procedure = self._mapping_field_to_attire(link, len(procedure_list), order)
+                    procedure_list.append(link["ability_metadata"]["ability_name"])
+                    return_dict["procedures"].append(procedure)
+                else:
+                    for procedure in return_dict["procedures"]:
+                        if procedure["procedure-name"] == link["ability_metadata"]["ability_name"]:
+                            procedure["steps"].append(self._create_step(link, order))
+        return return_dict
 
     async def get_operation_event_logs(self, operation_id: str, access: dict, output: bool):
         operation = await self.get_operation_object(operation_id, access)
         event_logs = await operation.event_logs(file_svc=self._file_svc, data_svc=self._data_svc, output=output)
-        return event_logs
+        return self._event_logs_to_attire(event_logs)
 
     async def create_object_from_schema(self, schema: SchemaMeta, data: dict,
                                         access: BaseWorld.Access, existing_operation: Operation = None):
