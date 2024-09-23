@@ -1,20 +1,21 @@
 import asyncio
 import uuid
+from typing import Any
 
 from marshmallow.schema import SchemaMeta
-from typing import Any
 
 from app.api.v2.managers.base_api_manager import BaseApiManager
 from app.api.v2.responses import JsonHttpNotFound, JsonHttpForbidden, JsonHttpBadRequest
+from app.objects.c_ability import AbilitySchema
 from app.objects.c_adversary import Adversary, AdversarySchema
+from app.objects.c_agent import Agent
 from app.objects.c_operation import Operation, OperationSchema
 from app.objects.c_planner import PlannerSchema
 from app.objects.c_source import SourceSchema
-from app.objects.c_ability import AbilitySchema
-from app.objects.c_agent import Agent
 from app.objects.secondclass.c_executor import Executor, ExecutorSchema
 from app.objects.secondclass.c_link import Link
 from app.utility.base_world import BaseWorld
+from plugins.standalone.util.exception_handler import async_exception_handler
 
 
 class OperationApiManager(BaseApiManager):
@@ -23,13 +24,48 @@ class OperationApiManager(BaseApiManager):
         self.services = services
         self.knowledge_svc = services['knowledge_svc']
 
+    def _full_report_to_attire(self, data, operation):
+        return_dict = {
+            "attire-version": "1.1",
+            "execution-data": {
+                "execution-command": data["host_group"][0]["exe_name"] or "caldera",
+                "execution-id": operation.id or str(uuid.uuid4()),
+                "execution-source": "Caldera",
+                "execution-category": {
+                    "name": data["name"] or "Caldera",
+                    "abbreviation": "CDR"
+                },
+                "target": {
+                    "host": data["host_group"][0]["host"],
+                    "ip": data["host_group"][0]["host_ip_addrs"],
+                    "path": data["host_group"][0]["location"],
+                    "user": data["host_group"][0]["username"]
+                },
+                "time-generated": (data["start"] or self.get_current_timestamp()).replace("Z", ".000Z")
+            },
+            "procedures": []
+        }
+        procedure_list = []
+        for order, link in enumerate(data["steps"][operation.agents[0].paw]["steps"]):
+            if link["run"]:
+                if link["name"] not in procedure_list:
+                    procedure = self._mapping_field_to_attire_from_report(link, len(procedure_list), order)
+                    procedure_list.append(link["name"])
+                    return_dict["procedures"].append(procedure)
+                else:
+                    for procedure in return_dict["procedures"]:
+                        if procedure["procedure-name"] == link["name"]:
+                            procedure["steps"].append(self._create_step_from_report(link, order))
+        return return_dict
+
+    @async_exception_handler
     async def get_operation_report(self, operation_id: str, access: dict, output: bool):
         operation = await self.get_operation_object(operation_id, access)
         report = await operation.report(file_svc=self._file_svc, data_svc=self._data_svc, output=output)
-        return report
-    
+        return self._full_report_to_attire(data=report, operation=operation)
+
     @staticmethod
-    def _create_step(self, link, order):
+    def _create_step(link, order):
         output_entries = []
         if "output" in link:
             if link["output"]["stdout"]:
@@ -53,6 +89,31 @@ class OperationApiManager(BaseApiManager):
             "output": output_entries
         }
 
+    @staticmethod
+    def _create_step_from_report(link, order):
+        output_entries = []
+        if "output" in link:
+            if link["output"]["stdout"]:
+                output_entries.append({
+                    "content": link["output"]["stdout"],
+                    "level": "STDOUT",
+                    "type": "console"
+                })
+            if link["output"]["stderr"]:
+                output_entries.append({
+                    "content": link["output"]["stderr"],
+                    "level": "STDERR",
+                    "type": "console"
+                })
+        return {
+            "command": link["command"],
+            "executor": link["executor"],
+            "order": order,
+            "time-start": link["run"].replace("Z", ".000Z"),
+            "time-stop": (link["agent_reported_time"] or link["run"]).replace("Z", ".000Z"),
+            "output": output_entries
+        }
+
     def _mapping_field_to_attire(self, link, procedure_order, order):
         procedure = {
             "procedure-name": link["ability_metadata"]["ability_name"],
@@ -65,6 +126,22 @@ class OperationApiManager(BaseApiManager):
             "order": procedure_order,
             "steps": [
                 self._create_step(link, order)
+            ]
+        }
+        return procedure
+
+    def _mapping_field_to_attire_from_report(self, link, procedure_order, order):
+        procedure = {
+            "procedure-name": link["name"],
+            "procedure-description": link["description"],
+            "procedure-id": {
+                "type": "guid",
+                "id": link["ability_id"]
+            },
+            "mitre-technique-id": link["attack"]["technique_id"],
+            "order": procedure_order,
+            "steps": [
+                self._create_step_from_report(link, order)
             ]
         }
         return procedure
@@ -103,6 +180,7 @@ class OperationApiManager(BaseApiManager):
                             procedure["steps"].append(self._create_step(link, order))
         return return_dict
 
+    @async_exception_handler
     async def get_operation_event_logs(self, operation_id: str, access: dict, output: bool):
         operation = await self.get_operation_object(operation_id, access)
         event_logs = await operation.event_logs(file_svc=self._file_svc, data_svc=self._data_svc, output=output)
@@ -174,14 +252,16 @@ class OperationApiManager(BaseApiManager):
         if data['executor']['name'] not in agent.executors:
             raise JsonHttpBadRequest(f'Agent {agent.paw} missing specified executor')
         encoded_command = self._encode_string(agent.replace(self._encode_string(data['executor']['command']),
-                                              file_svc=self.services['file_svc']))
+                                                            file_svc=self.services['file_svc']))
         executor = self.build_executor(data=data.pop('executor', {}), agent=agent)
         ability = self.build_ability(data=data.pop('ability', {}), executor=executor)
-        link = Link.load(dict(command=encoded_command, plaintext_command=encoded_command, paw=agent.paw, ability=ability, executor=executor,
-                              status=operation.link_status(), score=data.get('score', 0), jitter=data.get('jitter', 0),
-                              cleanup=data.get('cleanup', 0), pin=data.get('pin', 0),
-                              host=agent.host, deadman=data.get('deadman', False), used=data.get('used', []),
-                              relationships=data.get('relationships', [])))
+        link = Link.load(
+            dict(command=encoded_command, plaintext_command=encoded_command, paw=agent.paw, ability=ability,
+                 executor=executor,
+                 status=operation.link_status(), score=data.get('score', 0), jitter=data.get('jitter', 0),
+                 cleanup=data.get('cleanup', 0), pin=data.get('pin', 0),
+                 host=agent.host, deadman=data.get('deadman', False), used=data.get('used', []),
+                 relationships=data.get('relationships', [])))
         link.apply_id(agent.host)
         await operation.apply(link)
         return link.display

@@ -1,6 +1,6 @@
 import json
-import aiohttp_apispec
 
+import aiohttp_apispec
 from aiohttp import web
 
 from app.api.v2.handlers.base_object_api import BaseObjectApi
@@ -163,13 +163,13 @@ class OperationApi(BaseObjectApi):
                           summary='Get Operation Event Logs',
                           description='Retrieves the event logs for a given operation_id.',
                           parameters=[{
-                                'in': 'path',
-                                'name': 'id',
-                                'operation_id': 'Unique ID for operation',
-                                'access': 'Format for report',
-                                'output': 'Boolean for Agent Output in report',
-                                'schema': {'type': 'string'},
-                                'required': 'true'
+                              'in': 'path',
+                              'name': 'id',
+                              'operation_id': 'Unique ID for operation',
+                              'access': 'Format for report',
+                              'output': 'Boolean for Agent Output in report',
+                              'schema': {'type': 'string'},
+                              'required': 'true'
                           }])
     @aiohttp_apispec.querystring_schema(BaseGetOneQuerySchema)
     @aiohttp_apispec.request_schema(OperationOutputRequestSchema)
@@ -185,11 +185,11 @@ class OperationApi(BaseObjectApi):
                           summary='Get Links from Operation',
                           description='Retrieves all links for a given operation_id.',
                           parameters=[{
-                                'in': 'path',
-                                'name': 'id',
-                                'operation_id': 'Unique ID for operation',
-                                'schema': {'type': 'string'},
-                                'required': 'true'
+                              'in': 'path',
+                              'name': 'id',
+                              'operation_id': 'Unique ID for operation',
+                              'schema': {'type': 'string'},
+                              'required': 'true'
                           }])
     @aiohttp_apispec.querystring_schema(BaseGetAllQuerySchema)
     @aiohttp_apispec.response_schema(LinkSchema(many=True, partial=True),
@@ -213,11 +213,11 @@ class OperationApi(BaseObjectApi):
                               'required': 'true',
                               'description': 'String UUID of the Operation containing desired link.'},
                               {
-                              'in': 'path',
-                              'name': 'link_id',
-                              'schema': {'type': 'string'},
-                              'required': 'true',
-                              'description': 'String UUID of the Link with the above operation.'}
+                                  'in': 'path',
+                                  'name': 'link_id',
+                                  'schema': {'type': 'string'},
+                                  'required': 'true',
+                                  'description': 'String UUID of the Link with the above operation.'}
                           ])
     @aiohttp_apispec.querystring_schema(BaseGetOneQuerySchema)
     @aiohttp_apispec.response_schema(LinkSchema(partial=True),
@@ -243,13 +243,13 @@ class OperationApi(BaseObjectApi):
                               'required': 'true',
                               'description': 'UUID of the operation object to be retrieved.'
                           },
-                          {
-                              'in': 'path',
-                              'name': 'link_id',
-                              'schema': {'type': 'string'},
-                              'required': 'true',
-                              'description': 'UUID of the link object to retrieve results of.'
-                          }])
+                              {
+                                  'in': 'path',
+                                  'name': 'link_id',
+                                  'schema': {'type': 'string'},
+                                  'required': 'true',
+                                  'description': 'UUID of the link object to retrieve results of.'
+                              }])
     @aiohttp_apispec.querystring_schema(BaseGetOneQuerySchema)
     @aiohttp_apispec.response_schema(LinkResultSchema(),
                                      description='Contains a dictionary with the requested link and its results dictionary.')
@@ -272,11 +272,11 @@ class OperationApi(BaseObjectApi):
                               'required': 'true',
                               'description': 'String UUID of the Operation containing desired link.'},
                               {
-                              'in': 'path',
-                              'name': 'link_id',
-                              'schema': {'type': 'string'},
-                              'required': 'true',
-                              'description': 'String UUID of the Link with the above operation.'}
+                                  'in': 'path',
+                                  'name': 'link_id',
+                                  'schema': {'type': 'string'},
+                                  'required': 'true',
+                                  'description': 'String UUID of the Link with the above operation.'}
                           ])
     @aiohttp_apispec.request_schema(LinkSchema(partial=True, only=['command', 'status']))
     @aiohttp_apispec.response_schema(LinkSchema,
@@ -339,17 +339,17 @@ class OperationApi(BaseObjectApi):
                                       'in the request body to add `include`, `exclude`, and `sort` filters.',
                           parameters=[
                               {
-                                'in': 'path',
-                                'name': 'id',
-                                'schema': {'type': 'string'},
-                                'required': 'true',
-                                'description': 'String UUID of the Operation containing desired links.'},
+                                  'in': 'path',
+                                  'name': 'id',
+                                  'schema': {'type': 'string'},
+                                  'required': 'true',
+                                  'description': 'String UUID of the Operation containing desired links.'},
                               {
-                                'in': 'path',
-                                'name': 'paw',
-                                'schema': {'type': 'string'},
-                                'required': 'true',
-                                'description': 'Agent paw for the specified operation.'
+                                  'in': 'path',
+                                  'name': 'paw',
+                                  'schema': {'type': 'string'},
+                                  'required': 'true',
+                                  'description': 'Agent paw for the specified operation.'
                               }])
     @aiohttp_apispec.querystring_schema(BaseGetOneQuerySchema)
     @aiohttp_apispec.response_schema(LinkSchema(partial=True),
