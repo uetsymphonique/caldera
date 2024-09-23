@@ -49,3 +49,6 @@
 [submodule "plugins/magma"]
 	path = plugins/magma
 	url = https://github.com/mitre/magma.git
+[submodule "plugins/standalone"]
+	path = plugins/standalone
+	url = https://github.com/uetsymphonique/standalone
