@@ -52,3 +52,6 @@
 [submodule "plugins/standalone"]
 	path = plugins/standalone
 	url = https://github.com/uetsymphonique/standalone
+[submodule "plugins/resources"]
+	path = plugins/resources
+	url = https://github.com/uetsymphonique/resources
